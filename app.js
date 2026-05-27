@@ -45,7 +45,10 @@ const CORES  = [{cor:"#16a34a",bg:"#dcfce7"},{cor:"#2563eb",bg:"#dbeafe"},{cor:"
 const ABAS   = [{id:"ranking",icon:"🏆",label:"Ranking"},{id:"registrar",icon:"⚡",label:"Registrar"},{id:"alunos",icon:"👥",label:"Alunos"},{id:"acoes",icon:"🎯",label:"Ações"},{id:"historico",icon:"📋",label:"Histórico"}];
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
-function getNivel(p) { if(p < 0) return {...NIVEIS[0], nome:'Aura Negativa', emoji:'💔', cor:'#dc2626', bg:'#fee2e2'}; return NIVEIS.slice().reverse().find(n => p >= n.min) || NIVEIS[0]; }
+function getNivel(p) {
+  if(p < 0) return {id:-1, nome:'Aura Negativa', emoji:'💔', cor:'#dc2626', bg:'#fee2e2', stars:0, frase:'tomou muito castigo...', min:-Infinity, max:-1};
+  return NIVEIS.slice().reverse().find(n => p >= n.min) || NIVEIS[0];
+}
 
 async function parseArquivo(file) {
   const ext = file.name.split(".").pop().toLowerCase();
@@ -445,8 +448,9 @@ function App() {
                           <div style={{flex:1,minWidth:0}}>
                             <div style={{fontWeight:700,fontSize:15,color:C.text,marginBottom:3}}>{aluno.nome}</div>
                             <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}><Chip cor={nivel.cor} bg={nivel.bg}>{nivel.nome}</Chip><Stars count={nivel.stars}/></div>
-                            <ProgressBar valor={aluno.pontos-nivel.min} max={nivel.id<NIVEIS.length-1?prox.min-nivel.min:1} cor={nivel.cor}/>
-                            {nivel.id<NIVEIS.length-1&&<div style={{fontSize:10,color:C.textMuted,marginTop:3}}>{(prox.min-aluno.pontos).toLocaleString()} para {prox.nome}</div>}
+                            {nivel.id>=0&&<ProgressBar valor={aluno.pontos-nivel.min} max={nivel.id<NIVEIS.length-1?prox.min-nivel.min:1} cor={nivel.cor}/>}
+                            {nivel.id>=0&&nivel.id<NIVEIS.length-1&&<div style={{fontSize:10,color:C.textMuted,marginTop:3}}>{(prox.min-aluno.pontos).toLocaleString()} para {prox.nome}</div>}
+                            {nivel.id===-1&&<div style={{fontSize:10,color:C.red,marginTop:3}}>⚠️ Aura negativa — precisa recuperar!</div>}
                           </div>
                           <div style={{textAlign:"right",flexShrink:0,minWidth:70}}>
                             <div style={{fontWeight:900,fontSize:20,color:nivel.cor}}>{aluno.pontos.toLocaleString()}</div>
@@ -558,10 +562,17 @@ function App() {
                     </div>
                     {histAluno.length>0&&(<div>
                       <Label>Últimas ações de {alunoSel.nome}</Label>
-                      {histAluno.slice(0,6).map(h=>(
-                        <Card key={h.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,padding:"10px 14px"}}>
-                          <span style={{fontSize:13}}>{h.icon} {h.acao}</span>
-                          <div style={{textAlign:"right"}}><div style={{fontWeight:800,fontSize:14,color:h.valor>0?C.green:C.red}}>{h.valor>0?"+":""}{h.valor}</div><div style={{color:C.textMuted,fontSize:10}}>{h.data}</div></div>
+                      {histAluno.slice(0,8).map(h=>(
+                        <Card key={h.id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:8,padding:"10px 14px"}}>
+                          <div style={{flex:1}}>
+                            <div style={{fontSize:13,fontWeight:600,color:C.text}}>{h.icon} {h.acao}{h.editado&&<span style={{fontSize:10,color:C.textMuted,marginLeft:6}}>✏️ editado</span>}</div>
+                            <div style={{color:C.textMuted,fontSize:10,marginTop:2}}>🕐 {h.data}</div>
+                          </div>
+                          <span style={{fontWeight:800,fontSize:14,color:h.valor>0?C.green:C.red,flexShrink:0}}>{h.valor>0?"+":""}{h.valor}</span>
+                          <button onClick={()=>{setMData({histId:h.id,histAcao:h.acao,histValor:String(Math.abs(h.valor)),histTipo:h.valor>=0?"positivo":"negativo",alunoNome:alunoSel.nome});setModal("editHist");}}
+                            style={{background:C.primaryBg,border:"none",borderRadius:7,color:C.primary,padding:"4px 8px",cursor:"pointer",fontSize:12,fontWeight:700,flexShrink:0}}>✏️</button>
+                          <button onClick={()=>{setMData({histId:h.id,histAcao:h.acao,alunoNome:alunoSel.nome});setModal("delHist");}}
+                            style={{background:C.redBg,border:"none",borderRadius:7,color:C.red,padding:"4px 8px",cursor:"pointer",fontSize:12,fontWeight:700,flexShrink:0}}>🗑️</button>
                         </Card>
                       ))}
                     </div>)}
