@@ -45,7 +45,7 @@ const CORES  = [{cor:"#16a34a",bg:"#dcfce7"},{cor:"#2563eb",bg:"#dbeafe"},{cor:"
 const ABAS   = [{id:"ranking",icon:"🏆",label:"Ranking"},{id:"registrar",icon:"⚡",label:"Registrar"},{id:"alunos",icon:"👥",label:"Alunos"},{id:"acoes",icon:"🎯",label:"Ações"},{id:"historico",icon:"📋",label:"Histórico"}];
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
-function getNivel(p) { return NIVEIS.slice().reverse().find(n => p >= n.min) || NIVEIS[0]; }
+function getNivel(p) { if(p < 0) return {...NIVEIS[0], nome:'Aura Negativa', emoji:'💔', cor:'#dc2626', bg:'#fee2e2'}; return NIVEIS.slice().reverse().find(n => p >= n.min) || NIVEIS[0]; }
 
 async function parseArquivo(file) {
   const ext = file.name.split(".").pop().toLowerCase();
@@ -289,7 +289,7 @@ function App() {
     if(selId===alunoId)setSelId(null);showToast("Aluno removido.","info");
   }
   async function editarPontos(alunoId,pts){
-    await turmaRef().update({alunos:alunos.map(a=>a.id===alunoId?{...a,pontos:Math.max(0,pts)}:a)});
+    await turmaRef().update({alunos:alunos.map(a=>a.id===alunoId?{...a,pontos:pts}:a)});
     showToast("Pontos atualizados!","success");
   }
   async function processarArquivo(file){
@@ -311,7 +311,7 @@ function App() {
   async function aplicarAcao(alunoId,acao){
     const novosAlunos=alunos.map(a=>{
       if(a.id!==alunoId)return a;
-      const antes=getNivel(a.pontos);const novos=Math.max(0,a.pontos+acao.valor);const depois=getNivel(novos);
+      const antes=getNivel(a.pontos);const novos=a.pontos+acao.valor;const depois=getNivel(novos);
       if(depois.id>antes.id)setTimeout(()=>showToast(`LEVEL UP! ${a.nome} → ${depois.nome} ${depois.emoji}`,"success"),0);
       else if(depois.id<antes.id)setTimeout(()=>showToast(`${a.nome} perdeu nível → ${depois.nome}`,"error"),0);
       else setTimeout(()=>showToast(`${acao.icon} ${a.nome}: ${acao.valor>0?"+":""}${acao.valor} AURA`,"info"),0);
@@ -330,6 +330,25 @@ function App() {
     showToast(editId?"Ação atualizada!":"Ação criada!","success");setModal(null);
   }
   async function deletarAcao(id){await turmaRef().update({acoes:acoes.filter(a=>a.id!==id)});showToast("Ação removida.","info");setModal(null);}
+  async function editarHistorico(registroId, novoValor, novaAcao){
+    const novoHist = historico.map(h => h.id===registroId ? {...h, acao:novaAcao, valor:novoValor, editado:true} : h);
+    // recalcula pontos dos alunos baseado no historico corrigido
+    const totais = {};
+    novoHist.forEach(h => { totais[h.alunoId] = (totais[h.alunoId]||0) + h.valor; });
+    const novosAlunos = alunos.map(a => ({...a, pontos: totais[a.id]||0}));
+    await turmaRef().update({historico:novoHist, alunos:novosAlunos});
+    showToast("Histórico atualizado!","success");
+  }
+  async function apagarHistorico(registroId){
+    const reg = historico.find(h=>h.id===registroId);
+    const novoHist = historico.filter(h=>h.id!==registroId);
+    // recalcula pontos
+    const totais = {};
+    novoHist.forEach(h => { totais[h.alunoId] = (totais[h.alunoId]||0) + h.valor; });
+    const novosAlunos = alunos.map(a => ({...a, pontos: totais[a.id]||0}));
+    await turmaRef().update({historico:novoHist, alunos:novosAlunos});
+    showToast("Registro removido e pontos recalculados!","info");
+  }
   function abrirNovaAcao(){setFormAcao({label:"",valor:"",icon:"🎯",cor:C.green,corBg:C.greenBg,tipo:"positivo"});setMData({});setModal("acao");}
   function abrirEditAcao(a){setFormAcao({label:a.label,valor:String(Math.abs(a.valor)),icon:a.icon,cor:a.cor,corBg:a.corBg||C.primaryBg,tipo:a.valor<0?"negativo":"positivo"});setMData({editId:a.id,custom:a.custom});setModal("acao");}
 
@@ -600,13 +619,23 @@ function App() {
           {aba==="historico"&&(
             <div className="content-single">
               <h2 style={{fontSize:20,fontWeight:800,color:C.text,marginBottom:8}}>📋 Histórico</h2>
-              <div style={{color:C.textMuted,fontSize:13,marginBottom:16}}>{historico.length} registros</div>
+              <div style={{color:C.textMuted,fontSize:13,marginBottom:16}}>{historico.length} registros · clique em um para editar ou apagar</div>
               {historico.length===0&&<Card><div style={{textAlign:"center",color:C.textMuted,padding:"30px 0"}}>Nenhum registro ainda.</div></Card>}
               {historico.map(h=>{
                 const a=alunos.find(x=>x.id===h.alunoId);const n=a?getNivel(a.pontos):null;
-                return(<Card key={h.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,padding:"11px 16px"}}>
-                  <div><div style={{fontWeight:700,fontSize:13,color:n?.cor||C.textSub}}>{n?.emoji||"❓"} {h.alunoNome}</div><div style={{color:C.textMuted,fontSize:11,marginTop:2}}>{h.icon} {h.acao} · {h.data}</div></div>
-                  <span style={{fontWeight:900,fontSize:16,color:h.valor>0?C.green:C.red}}>{h.valor>0?"+":""}{h.valor}</span>
+                return(<Card key={h.id} style={{display:"flex",alignItems:"center",gap:12,marginBottom:8,padding:"11px 16px"}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:700,fontSize:13,color:n?.cor||C.textSub}}>{n?.emoji||"❓"} {h.alunoNome}</div>
+                    <div style={{color:C.textMuted,fontSize:11,marginTop:2}}>{h.icon} {h.acao} {h.editado?"· ✏️ editado":""}</div>
+                    <div style={{color:C.textMuted,fontSize:10,marginTop:1}}>🕐 {h.data}</div>
+                  </div>
+                  <span style={{fontWeight:900,fontSize:16,color:h.valor>0?C.green:C.red,minWidth:50,textAlign:"right"}}>{h.valor>0?"+":""}{h.valor}</span>
+                  <div style={{display:"flex",gap:6,flexShrink:0}}>
+                    <button onClick={()=>{setMData({histId:h.id,histAcao:h.acao,histValor:String(Math.abs(h.valor)),histTipo:h.valor>=0?"positivo":"negativo",alunoNome:h.alunoNome});setModal("editHist");}}
+                      style={{background:C.primaryBg,border:"none",borderRadius:8,color:C.primary,padding:"5px 9px",cursor:"pointer",fontSize:12,fontWeight:700}}>✏️</button>
+                    <button onClick={()=>{setMData({histId:h.id,alunoNome:h.alunoNome,histAcao:h.acao});setModal("delHist");}}
+                      style={{background:C.redBg,border:"none",borderRadius:8,color:C.red,padding:"5px 9px",cursor:"pointer",fontSize:12,fontWeight:700}}>🗑️</button>
+                  </div>
                 </Card>);
               })}
             </div>
@@ -681,6 +710,44 @@ function App() {
       {modal==="delAcao"&&(<Modal title="Remover ação?" onClose={()=>setModal(null)}>
         <div style={{color:C.textSub,fontSize:14,marginBottom:18}}>A ação <b style={{color:C.text}}>{formAcao.label}</b> será removida.</div>
         <div style={{display:"flex",gap:8}}><Btn onClick={()=>setModal("acao")} variant="ghost" style={{flex:1}}>Cancelar</Btn><Btn onClick={()=>deletarAcao(mData.editId)} variant="danger" style={{flex:1}}>Remover</Btn></div>
+      </Modal>)}
+
+      {modal==="editHist"&&(<Modal title="✏️ Editar Registro" onClose={()=>setModal(null)}>
+        <div style={{color:C.textSub,fontSize:13,marginBottom:14}}>Editando registro de <b style={{color:C.text}}>{mData.alunoNome}</b></div>
+        <Label>Descrição da ação</Label>
+        <Input value={mData.histAcao||""} onChange={e=>setMData(d=>({...d,histAcao:e.target.value}))} placeholder="Ex: Participação" style={{marginBottom:12}}/>
+        <Label>Tipo</Label>
+        <div style={{display:"flex",gap:8,marginBottom:12}}>
+          {[["positivo","✅ Positivo",C.green,C.greenBg],["negativo","❌ Negativo",C.red,C.redBg]].map(([val,lbl,cor,bg])=>(
+            <button key={val} onClick={()=>setMData(d=>({...d,histTipo:val}))} style={{flex:1,background:mData.histTipo===val?bg:"#f1f5f9",border:`1.5px solid ${mData.histTipo===val?cor:C.border}`,borderRadius:10,padding:"9px",color:mData.histTipo===val?cor:C.textSub,fontWeight:700,fontSize:13,cursor:"pointer"}}>{lbl}</button>
+          ))}
+        </div>
+        <Label>Valor de Aura</Label>
+        <Input type="number" min={1} value={mData.histValor||""} onChange={e=>setMData(d=>({...d,histValor:e.target.value}))} placeholder="Ex: 150" style={{marginBottom:16}}/>
+        <div style={{background:"#f8f9fb",borderRadius:10,padding:"10px 14px",marginBottom:16,fontSize:13,color:C.textSub}}>
+          ⚠️ Editar recalcula automaticamente os pontos do aluno.
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <Btn onClick={()=>setModal(null)} variant="ghost" style={{flex:1}}>Cancelar</Btn>
+          <Btn onClick={()=>{
+            const val=parseInt(mData.histValor,10);
+            if(!mData.histAcao?.trim()||isNaN(val)||val===0){showToast("Preencha todos os campos!","error");return;}
+            const finalVal=mData.histTipo==="negativo"?-Math.abs(val):Math.abs(val);
+            editarHistorico(mData.histId,finalVal,mData.histAcao.trim());
+            setModal(null);
+          }} variant="primary" style={{flex:2}}>Salvar</Btn>
+        </div>
+      </Modal>)}
+
+      {modal==="delHist"&&(<Modal title="Apagar registro?" onClose={()=>setModal(null)}>
+        <div style={{color:C.textSub,fontSize:14,marginBottom:8}}>Apagar o registro de <b style={{color:C.text}}>{mData.histAcao}</b> de <b style={{color:C.text}}>{mData.alunoNome}</b>?</div>
+        <div style={{background:C.yellowBg,border:`1px solid ${C.yellow}40`,borderRadius:10,padding:"10px 14px",fontSize:13,color:C.yellow,fontWeight:600,marginBottom:18}}>
+          ⚠️ Os pontos do aluno serão recalculados automaticamente.
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <Btn onClick={()=>setModal(null)} variant="ghost" style={{flex:1}}>Cancelar</Btn>
+          <Btn onClick={()=>{apagarHistorico(mData.histId);setModal(null);}} variant="danger" style={{flex:1}}>Apagar</Btn>
+        </div>
       </Modal>)}
     </div>
   );
