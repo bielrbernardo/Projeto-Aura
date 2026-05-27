@@ -232,6 +232,9 @@ function App() {
   const [importNomes,setImportNomes]=useState([]);
   const [importDrag,setImportDrag]=useState(false);
   const [importLoading,setImportLoading]=useState(false);
+  const [modoMassa,setModoMassa]=useState(false);
+  const [acaoMassa,setAcaoMassa]=useState(null);
+  const [alunosMassa,setAlunosMassa]=useState(new Set());
   const fileRef=useRef();
   const toastRef=useRef();
 
@@ -323,6 +326,25 @@ function App() {
     const aluno=alunos.find(a=>a.id===alunoId);
     const novoHist=[{id:uid(),alunoId,alunoNome:aluno?.nome,acao:acao.label,valor:acao.valor,icon:acao.icon,data:new Date().toLocaleString("pt-BR")},...historico].slice(0,200);
     await turmaRef().update({alunos:novosAlunos,historico:novoHist});
+  }
+  async function aplicarAcaoMassa(acao, ids){
+    if(!ids.size){showToast("Selecione ao menos um aluno!","error");return;}
+    const data = new Date().toLocaleString("pt-BR");
+    const novosRegistros = [];
+    const novosAlunos = alunos.map(a=>{
+      if(!ids.has(a.id)) return a;
+      const antes=getNivel(a.pontos);
+      const novos=a.pontos+acao.valor;
+      const depois=getNivel(novos);
+      novosRegistros.push({id:uid(),alunoId:a.id,alunoNome:a.nome,acao:acao.label,valor:acao.valor,icon:acao.icon,data});
+      return {...a,pontos:novos};
+    });
+    const novoHist=[...novosRegistros,...historico].slice(0,200);
+    await turmaRef().update({alunos:novosAlunos,historico:novoHist});
+    showToast(`${acao.icon} ${acao.label} aplicado para ${ids.size} aluno(s)!`,"success");
+    setAlunosMassa(new Set());
+    setAcaoMassa(null);
+    setModoMassa(false);
   }
   async function salvarAcao(editId){
     const valor=parseInt(formAcao.valor,10);
@@ -494,7 +516,109 @@ function App() {
           {/* REGISTRAR */}
           {aba==="registrar"&&(
             <div>
-              <h2 style={{fontSize:20,fontWeight:800,color:C.text,marginBottom:20}}>⚡ Registrar Aura</h2>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+                <h2 style={{fontSize:20,fontWeight:800,color:C.text}}>⚡ Registrar Aura</h2>
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={()=>{setModoMassa(false);setAcaoMassa(null);setAlunosMassa(new Set());}}
+                    style={{background:!modoMassa?C.primary:"#f1f5f9",border:"none",borderRadius:10,padding:"8px 14px",color:!modoMassa?"#fff":C.textSub,fontWeight:700,fontSize:13,cursor:"pointer"}}>
+                    👤 Individual
+                  </button>
+                  <button onClick={()=>{setModoMassa(true);setSelId(null);setAcaoMassa(null);setAlunosMassa(new Set());}}
+                    style={{background:modoMassa?C.primary:"#f1f5f9",border:"none",borderRadius:10,padding:"8px 14px",color:modoMassa?"#fff":C.textSub,fontWeight:700,fontSize:13,cursor:"pointer"}}>
+                    👥 Em Massa
+                  </button>
+                </div>
+              </div>
+
+              {/* MODO EM MASSA */}
+              {modoMassa&&(
+                <div>
+                  <div style={{background:C.primaryBg,border:`1px solid ${C.primary}30`,borderRadius:14,padding:16,marginBottom:20}}>
+                    <div style={{fontWeight:700,fontSize:14,color:C.primary,marginBottom:4}}>👥 Modo Em Massa</div>
+                    <div style={{fontSize:13,color:C.textSub}}>1. Selecione uma ação → 2. Marque os alunos → 3. Clique em Aplicar</div>
+                  </div>
+                  <div className="content-grid">
+                    {/* Coluna ações */}
+                    <div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:20}}>
+                        <div>
+                          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10,padding:"6px 12px",background:C.greenBg,borderRadius:8}}>
+                            <span style={{fontSize:14}}>✅</span><span style={{fontWeight:700,fontSize:12,color:C.green}}>POSITIVAS</span>
+                          </div>
+                          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                            {acoes.filter(a=>a.valor>0).map(acao=>(
+                              <button key={acao.id} onClick={()=>setAcaoMassa(acaoMassa?.id===acao.id?null:acao)}
+                                style={{background:acaoMassa?.id===acao.id?acao.cor:acao.corBg||C.greenBg,border:`2px solid ${acaoMassa?.id===acao.id?acao.cor:acao.cor+"40"}`,borderRadius:12,padding:"12px 10px",cursor:"pointer",display:"flex",alignItems:"center",gap:10,transition:"all 0.15s",textAlign:"left"}}>
+                                <span style={{fontSize:20,flexShrink:0}}>{acao.icon}</span>
+                                <span style={{color:acaoMassa?.id===acao.id?"#fff":acao.cor,fontWeight:700,fontSize:12,flex:1}}>{acao.label}</span>
+                                <span style={{color:acaoMassa?.id===acao.id?"#fff":C.green,fontWeight:900,fontSize:14,flexShrink:0}}>+{acao.valor}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10,padding:"6px 12px",background:C.redBg,borderRadius:8}}>
+                            <span style={{fontSize:14}}>❌</span><span style={{fontWeight:700,fontSize:12,color:C.red}}>NEGATIVAS</span>
+                          </div>
+                          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                            {acoes.filter(a=>a.valor<0).map(acao=>(
+                              <button key={acao.id} onClick={()=>setAcaoMassa(acaoMassa?.id===acao.id?null:acao)}
+                                style={{background:acaoMassa?.id===acao.id?acao.cor:acao.corBg||C.redBg,border:`2px solid ${acaoMassa?.id===acao.id?acao.cor:acao.cor+"40"}`,borderRadius:12,padding:"12px 10px",cursor:"pointer",display:"flex",alignItems:"center",gap:10,transition:"all 0.15s",textAlign:"left"}}>
+                                <span style={{fontSize:20,flexShrink:0}}>{acao.icon}</span>
+                                <span style={{color:acaoMassa?.id===acao.id?"#fff":acao.cor,fontWeight:700,fontSize:12,flex:1}}>{acao.label}</span>
+                                <span style={{color:acaoMassa?.id===acao.id?"#fff":C.red,fontWeight:900,fontSize:14,flexShrink:0}}>{acao.valor}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Coluna alunos */}
+                    <div>
+                      {acaoMassa&&(
+                        <div style={{background:acaoMassa.corBg,border:`2px solid ${acaoMassa.cor}`,borderRadius:12,padding:"12px 16px",marginBottom:16,display:"flex",alignItems:"center",gap:10}}>
+                          <span style={{fontSize:24}}>{acaoMassa.icon}</span>
+                          <div style={{flex:1}}><div style={{fontWeight:800,color:acaoMassa.cor}}>{acaoMassa.label}</div><div style={{fontSize:12,color:C.textSub}}>Ação selecionada</div></div>
+                          <span style={{fontWeight:900,fontSize:20,color:acaoMassa.valor>0?C.green:C.red}}>{acaoMassa.valor>0?"+":""}{acaoMassa.valor}</span>
+                        </div>
+                      )}
+                      {!acaoMassa&&<div style={{background:"#f8f9fb",border:`1px dashed ${C.borderMd}`,borderRadius:12,padding:16,marginBottom:16,textAlign:"center",color:C.textMuted,fontSize:13}}>← Selecione uma ação primeiro</div>}
+
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                        <Label style={{marginBottom:0}}>{alunosMassa.size} selecionado(s)</Label>
+                        <button onClick={()=>setAlunosMassa(prev=>prev.size===ranking.length?new Set():new Set(ranking.map(a=>a.id)))}
+                          style={{fontSize:12,color:C.primary,background:"transparent",border:"none",cursor:"pointer",fontWeight:700}}>
+                          {alunosMassa.size===ranking.length?"Desmarcar todos":"Selecionar todos"}
+                        </button>
+                      </div>
+                      <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:16}}>
+                        {ranking.map(a=>{
+                          const nivel=getNivel(a.pontos);const isSel=alunosMassa.has(a.id);
+                          return(
+                            <div key={a.id} onClick={()=>{setAlunosMassa(prev=>{const s=new Set(prev);s.has(a.id)?s.delete(a.id):s.add(a.id);return s;});}}
+                              style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:isSel?nivel.bg:C.card,border:`1.5px solid ${isSel?nivel.cor:C.border}`,borderRadius:12,cursor:"pointer",transition:"all 0.15s"}}>
+                              <div style={{width:20,height:20,borderRadius:5,border:`2px solid ${isSel?nivel.cor:C.borderMd}`,background:isSel?nivel.cor:"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                                {isSel&&<span style={{color:"#fff",fontSize:12,fontWeight:900}}>✓</span>}
+                              </div>
+                              <span style={{fontSize:18}}>{nivel.emoji}</span>
+                              <div style={{flex:1}}><div style={{fontWeight:600,fontSize:13,color:C.text}}>{a.nome}</div><div style={{fontSize:11,color:nivel.cor,fontWeight:700}}>{a.pontos.toLocaleString()} pts</div></div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <button onClick={()=>acaoMassa&&aplicarAcaoMassa(acaoMassa,alunosMassa)}
+                        disabled={!acaoMassa||alunosMassa.size===0}
+                        style={{width:"100%",background:!acaoMassa||alunosMassa.size===0?"#e2e8f0":acaoMassa.valor>0?C.green:C.red,border:"none",borderRadius:12,padding:"14px",color:!acaoMassa||alunosMassa.size===0?C.textMuted:"#fff",fontWeight:800,fontSize:15,cursor:!acaoMassa||alunosMassa.size===0?"not-allowed":"pointer",transition:"all 0.2s"}}>
+                        {!acaoMassa?"Selecione uma ação":alunosMassa.size===0?"Selecione os alunos":`Aplicar ${acaoMassa.icon} para ${alunosMassa.size} aluno(s)`}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* MODO INDIVIDUAL */}
+              {!modoMassa&&(
               <div className="content-grid">
                 <div>
                   <Label>Selecionar Aluno</Label>
@@ -579,6 +703,7 @@ function App() {
                   </div>
                 )}
               </div>
+              )}
             </div>
           )}
 
