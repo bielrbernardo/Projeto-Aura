@@ -518,17 +518,43 @@ function App() {
                 </div>
                 {alunoSel&&(
                   <div>
-                    <Label>Aplicar Ação</Label>
-                    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:10,marginBottom:20}}>
-                      {acoes.map(acao=>(
-                        <button key={acao.id} onClick={()=>aplicarAcao(alunoSel.id,acao)}
-                          style={{background:acao.corBg||"#f1f5f9",border:`1.5px solid ${acao.cor}30`,borderRadius:12,padding:"14px 10px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:5,transition:"opacity 0.15s"}}
-                          onMouseEnter={e=>e.currentTarget.style.opacity="0.8"} onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
-                          <span style={{fontSize:22}}>{acao.icon}</span>
-                          <span style={{color:acao.cor,fontWeight:700,fontSize:12,textAlign:"center"}}>{acao.label}</span>
-                          <span style={{color:acao.valor>0?C.green:C.red,fontWeight:900,fontSize:16}}>{acao.valor>0?"+":""}{acao.valor}</span>
-                        </button>
-                      ))}
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:20}}>
+                      {/* POSITIVAS */}
+                      <div>
+                        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10,padding:"6px 12px",background:C.greenBg,borderRadius:8}}>
+                          <span style={{fontSize:14}}>✅</span>
+                          <span style={{fontWeight:700,fontSize:12,color:C.green}}>POSITIVAS</span>
+                        </div>
+                        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                          {acoes.filter(a=>a.valor>0).map(acao=>(
+                            <button key={acao.id} onClick={()=>aplicarAcao(alunoSel.id,acao)}
+                              style={{background:acao.corBg||C.greenBg,border:`1.5px solid ${acao.cor}40`,borderRadius:12,padding:"12px 10px",cursor:"pointer",display:"flex",alignItems:"center",gap:10,transition:"opacity 0.15s",textAlign:"left"}}
+                              onMouseEnter={e=>e.currentTarget.style.opacity="0.8"} onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
+                              <span style={{fontSize:20,flexShrink:0}}>{acao.icon}</span>
+                              <span style={{color:acao.cor,fontWeight:700,fontSize:12,flex:1}}>{acao.label}</span>
+                              <span style={{color:C.green,fontWeight:900,fontSize:14,flexShrink:0}}>+{acao.valor}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      {/* NEGATIVAS */}
+                      <div>
+                        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10,padding:"6px 12px",background:C.redBg,borderRadius:8}}>
+                          <span style={{fontSize:14}}>❌</span>
+                          <span style={{fontWeight:700,fontSize:12,color:C.red}}>NEGATIVAS</span>
+                        </div>
+                        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                          {acoes.filter(a=>a.valor<0).map(acao=>(
+                            <button key={acao.id} onClick={()=>aplicarAcao(alunoSel.id,acao)}
+                              style={{background:acao.corBg||C.redBg,border:`1.5px solid ${acao.cor}40`,borderRadius:12,padding:"12px 10px",cursor:"pointer",display:"flex",alignItems:"center",gap:10,transition:"opacity 0.15s",textAlign:"left"}}
+                              onMouseEnter={e=>e.currentTarget.style.opacity="0.8"} onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
+                              <span style={{fontSize:20,flexShrink:0}}>{acao.icon}</span>
+                              <span style={{color:acao.cor,fontWeight:700,fontSize:12,flex:1}}>{acao.label}</span>
+                              <span style={{color:C.red,fontWeight:900,fontSize:14,flexShrink:0}}>{acao.valor}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                     {histAluno.length>0&&(<div>
                       <Label>Últimas ações de {alunoSel.nome}</Label>
