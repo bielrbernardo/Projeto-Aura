@@ -247,16 +247,19 @@ function App() {
     });
   },[]);
 
+  const iniciouTurma = useRef(false);
+
   useEffect(()=>{
     if(!usuario?.uid) return;
+    iniciouTurma.current = false;
     return db.collection("usuarios").doc(usuario.uid).collection("turmas").orderBy("criadaEm","asc").onSnapshot(snap=>{
       const lista=snap.docs.map(d=>({id:d.id,...d.data(),acoes:d.data().acoes||ACOES_PADRAO}));
       setTurmas(lista);
-      // Só define turmaId se ainda não tiver nenhuma selecionada
-      setTurmaId(prev => {
-        if(!prev && lista.length) return lista[0].id;
-        return prev;
-      });
+      // Só seleciona a primeira turma UMA VEZ ao carregar
+      if(!iniciouTurma.current && lista.length){
+        iniciouTurma.current = true;
+        setTurmaId(lista[0].id);
+      }
     });
   },[usuario?.uid]);
 
