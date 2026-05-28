@@ -261,7 +261,7 @@ function App() {
     });
   },[usuario?.uid]);
 
-  function setTurmaIdSafe(id){turmaIdRef.current=id;setTurmaIdSafe(id);}
+  function setTurmaIdSafe(id){turmaIdRef.current=id;setTurmaId(id);}
   function showToast(msg,tipo="info"){clearTimeout(toastRef.current);setToast({msg,tipo});toastRef.current=setTimeout(()=>setToast(null),2800);}
 
   const turmaAtual=turmas.find(t=>t.id===turmaId)||turmas[0];
