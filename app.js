@@ -42,7 +42,7 @@ const ACOES_PADRAO = [
 
 const EMOJIS = ["🎯","⭐","🔥","💡","🏅","🎮","📚","✏️","🧠","🤖","🎵","🏆","🌟","⚡","🚀","🤝","💪","📋","🙋","❌","💀","🔴","😤","🥳","🎉","🌈","💎","👑","✨","📝","🤲","📵","🏃","🎤","🖥️"];
 const CORES  = [{cor:"#16a34a",bg:"#dcfce7"},{cor:"#2563eb",bg:"#dbeafe"},{cor:"#7c3aed",bg:"#ede9fe"},{cor:"#ca8a04",bg:"#fef9c3"},{cor:"#e11d48",bg:"#fff1f2"},{cor:"#ea580c",bg:"#ffedd5"},{cor:"#dc2626",bg:"#fee2e2"},{cor:"#0891b2",bg:"#cffafe"},{cor:"#6366f1",bg:"#eef2ff"},{cor:"#0f766e",bg:"#ccfbf1"}];
-const ABAS   = [{id:"ranking",icon:"🏆",label:"Ranking"},{id:"registrar",icon:"⚡",label:"Registrar"},{id:"alunos",icon:"👥",label:"Alunos"},{id:"acoes",icon:"🎯",label:"Ações"},{id:"historico",icon:"📋",label:"Histórico"}];
+const ABAS   = [{id:"inicio",icon:"🏠",label:"Início"},{id:"ranking",icon:"🏆",label:"Ranking"},{id:"registrar",icon:"⚡",label:"Registrar"},{id:"alunos",icon:"👥",label:"Alunos"},{id:"acoes",icon:"🎯",label:"Ações"},{id:"historico",icon:"📋",label:"Histórico"}];
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
 function getNivel(p) {
@@ -220,7 +220,8 @@ function App() {
   const [usuario,setUsuario]=useState(undefined);
   const [turmas,setTurmas]=useState([]);
   const [turmaId,setTurmaId]=useState(null);
-  const [aba,setAba]=useState("ranking");
+  const turmaIdRef=useRef(null);
+  const [aba,setAba]=useState("inicio");
   const [selId,setSelId]=useState(null);
   const [toast,setToast]=useState(null);
   const [modal,setModal]=useState(null);
@@ -252,10 +253,15 @@ function App() {
     return db.collection("usuarios").doc(usuario.uid).collection("turmas").orderBy("criadaEm","asc").onSnapshot(snap=>{
       const lista=snap.docs.map(d=>({id:d.id,...d.data(),acoes:d.data().acoes||ACOES_PADRAO}));
       setTurmas(lista);
-      if(lista.length&&!turmaId) setTurmaId(lista[0].id);
+      // Usa ref para não sofrer com closure stale — bug de trocar de turma
+      if(lista.length&&!turmaIdRef.current){
+        turmaIdRef.current=lista[0].id;
+        setTurmaIdSafe(lista[0].id);
+      }
     });
   },[usuario?.uid]);
 
+  function setTurmaIdSafe(id){turmaIdRef.current=id;setTurmaIdSafe(id);}
   function showToast(msg,tipo="info"){clearTimeout(toastRef.current);setToast({msg,tipo});toastRef.current=setTimeout(()=>setToast(null),2800);}
 
   const turmaAtual=turmas.find(t=>t.id===turmaId)||turmas[0];
@@ -272,12 +278,12 @@ function App() {
 
   async function criarTurma(nome){
     const doc=await db.collection("usuarios").doc(usuario.uid).collection("turmas").add({nome:nome.trim(),alunos:[],historico:[],acoes:ACOES_PADRAO,criadaEm:firebase.firestore.FieldValue.serverTimestamp()});
-    setTurmaId(doc.id);setSelId(null);setAba("ranking");showToast(`Turma "${nome.trim()}" criada!`,"success");
+    setTurmaIdSafe(doc.id);setSelId(null);setAba("ranking");showToast(`Turma "${nome.trim()}" criada!`,"success");
   }
   async function deletarTurma(id){
     if(turmas.length===1){showToast("Precisa ter ao menos 1 turma!","error");return;}
     await turmaRef(id).delete();
-    const r=turmas.filter(t=>t.id!==id);setTurmaId(r[0]?.id||null);setSelId(null);showToast("Turma removida.","info");
+    const r=turmas.filter(t=>t.id!==id);setTurmaIdSafe(r[0]?.id||null);setSelId(null);showToast("Turma removida.","info");
   }
   async function renomearTurma(id,nome){if(nome?.trim()) await turmaRef(id).update({nome:nome.trim()});}
   async function adicionarAluno(nomeParam){
@@ -401,7 +407,7 @@ function App() {
               <button onClick={()=>{setMData({});setModal("novaTurma");}} style={{background:C.primaryBg,border:"none",borderRadius:6,color:C.primary,fontWeight:800,fontSize:18,cursor:"pointer",width:26,height:26,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
             </div>
             {turmas.map(t=>(
-              <button key={t.id} onClick={()=>{setTurmaId(t.id);setSelId(null);setAba("ranking");}}
+              <button key={t.id} onClick={()=>{setTurmaIdSafe(t.id);setSelId(null);setAba("ranking");}}
                 style={{display:"block",width:"100%",padding:"7px 12px",background:t.id===turmaId?C.primary:"#f1f5f9",border:"none",borderRadius:9,color:t.id===turmaId?"#fff":C.textSub,fontWeight:t.id===turmaId?700:500,fontSize:13,cursor:"pointer",textAlign:"left",marginBottom:4,transition:"all 0.15s"}}>
                 {t.nome}
               </button>
@@ -451,6 +457,153 @@ function App() {
           <Toast toast={toast}/>
 
           {/* RANKING */}
+          {aba==="inicio"&&(
+            <div>
+              <h2 style={{fontSize:20,fontWeight:800,color:C.text,marginBottom:4}}>🏠 Visão Geral</h2>
+              <div style={{color:C.textMuted,fontSize:13,marginBottom:24}}>Panorama de todas as suas turmas</div>
+
+              {/* Cards resumo por turma */}
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:16,marginBottom:32}}>
+                {turmas.map(t=>{
+                  const alns=t.alunos||[];
+                  const hist=t.historico||[];
+                  const rank=[...alns].sort((a,b)=>b.pontos-a.pontos);
+                  const media=alns.length?Math.round(alns.reduce((s,a)=>s+a.pontos,0)/alns.length):0;
+                  const lider=rank[0];
+                  const nivelLider=lider?getNivel(lider.pontos):null;
+                  const negativos=alns.filter(a=>a.pontos<0).length;
+                  const infinitos=alns.filter(a=>getNivel(a.pontos).id===7).length;
+                  const isAtual=t.id===turmaId;
+                  return(
+                    <div key={t.id} onClick={()=>{setTurmaIdSafe(t.id);setAba("ranking");}}
+                      style={{background:C.card,border:`2px solid ${isAtual?C.primary:C.border}`,borderRadius:16,padding:20,cursor:"pointer",transition:"all 0.2s",boxShadow:isAtual?`0 4px 20px ${C.primary}20`:"0 1px 4px #0000000a"}}
+                      onMouseEnter={e=>e.currentTarget.style.boxShadow=`0 4px 20px ${C.primary}20`}
+                      onMouseLeave={e=>e.currentTarget.style.boxShadow=isAtual?`0 4px 20px ${C.primary}20`:"0 1px 4px #0000000a"}>
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+                        <div style={{fontWeight:800,fontSize:16,color:C.text}}>{t.nome}</div>
+                        {isAtual&&<span style={{background:C.primaryBg,color:C.primary,borderRadius:99,padding:"2px 10px",fontSize:11,fontWeight:700}}>Atual</span>}
+                      </div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+                        {[["👥","Alunos",alns.length],["📊","Média",`${media} pts`],["✨","Infinita",infinitos],["💔","Negativos",negativos]].map(([icon,label,val])=>(
+                          <div key={label} style={{background:"#f8f9fb",borderRadius:10,padding:"10px 12px"}}>
+                            <div style={{fontSize:16,marginBottom:2}}>{icon}</div>
+                            <div style={{fontSize:10,color:C.textMuted}}>{label}</div>
+                            <div style={{fontSize:15,fontWeight:800,color:C.text}}>{val}</div>
+                          </div>
+                        ))}
+                      </div>
+                      {lider&&nivelLider&&(
+                        <div style={{background:nivelLider.bg,border:`1px solid ${nivelLider.cor}30`,borderRadius:10,padding:"10px 12px",display:"flex",alignItems:"center",gap:8}}>
+                          <span style={{fontSize:20}}>{nivelLider.emoji}</span>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontSize:10,color:C.textMuted}}>🏆 Líder</div>
+                            <div style={{fontWeight:700,fontSize:13,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{lider.nome}</div>
+                          </div>
+                          <span style={{fontWeight:900,fontSize:14,color:nivelLider.cor}}>{lider.pontos.toLocaleString()}</span>
+                        </div>
+                      )}
+                      {!lider&&<div style={{textAlign:"center",color:C.textMuted,fontSize:12,padding:"8px 0"}}>Nenhum aluno ainda</div>}
+                    </div>
+                  );
+                })}
+                {/* Card nova turma */}
+                <div onClick={()=>{setMData({});setModal("novaTurma");}}
+                  style={{background:"#f8f9fb",border:`2px dashed ${C.borderMd}`,borderRadius:16,padding:20,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8,minHeight:180,transition:"all 0.2s"}}
+                  onMouseEnter={e=>e.currentTarget.style.borderColor=C.primary}
+                  onMouseLeave={e=>e.currentTarget.style.borderColor=C.borderMd}>
+                  <div style={{fontSize:32,color:C.textMuted}}>+</div>
+                  <div style={{fontWeight:700,fontSize:14,color:C.textMuted}}>Nova Turma</div>
+                </div>
+              </div>
+
+              {/* Comparação de turmas */}
+              {turmas.length>1&&(
+                <div>
+                  <h3 style={{fontSize:16,fontWeight:800,color:C.text,marginBottom:16}}>📊 Comparação entre Turmas</h3>
+                  <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,overflow:"hidden"}}>
+                    {/* Header */}
+                    <div style={{display:"grid",gridTemplateColumns:`180px repeat(${turmas.length},1fr)`,background:"#f8f9fb",borderBottom:`1px solid ${C.border}`,padding:"10px 16px"}}>
+                      <div style={{fontSize:11,fontWeight:700,color:C.textMuted,textTransform:"uppercase"}}>Indicador</div>
+                      {turmas.map(t=>(
+                        <div key={t.id} style={{fontSize:12,fontWeight:700,color:t.id===turmaId?C.primary:C.text,textAlign:"center",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.nome}</div>
+                      ))}
+                    </div>
+                    {/* Linhas */}
+                    {[
+                      {label:"👥 Total alunos",    fn:t=>(t.alunos||[]).length},
+                      {label:"📊 Média de Aura",   fn:t=>{const a=t.alunos||[];return a.length?Math.round(a.reduce((s,x)=>s+x.pontos,0)/a.length):0;},suffix:" pts"},
+                      {label:"🏆 Maior Aura",      fn:t=>{const r=[...(t.alunos||[])].sort((a,b)=>b.pontos-a.pontos);return r[0]?.pontos||0;},suffix:" pts"},
+                      {label:"✨ Aura Infinita",   fn:t=>(t.alunos||[]).filter(a=>getNivel(a.pontos).id===7).length},
+                      {label:"👑 Aura Suprema+",   fn:t=>(t.alunos||[]).filter(a=>getNivel(a.pontos).id>=5).length},
+                      {label:"💔 Aura Negativa",   fn:t=>(t.alunos||[]).filter(a=>a.pontos<0).length},
+                      {label:"📋 Ações registradas",fn:t=>(t.historico||[]).length},
+                    ].map((row,ri)=>{
+                      const vals=turmas.map(t=>row.fn(t));
+                      const max=Math.max(...vals,1);
+                      return(
+                        <div key={ri} style={{display:"grid",gridTemplateColumns:`180px repeat(${turmas.length},1fr)`,padding:"12px 16px",borderBottom:ri<6?`1px solid ${C.border}`:"none",background:ri%2===0?"#fff":"#fafafa"}}>
+                          <div style={{fontSize:12,fontWeight:600,color:C.textSub,display:"flex",alignItems:"center"}}>{row.label}</div>
+                          {turmas.map((t,ti)=>{
+                            const val=vals[ti];
+                            const pct=max>0?(val/max)*100:0;
+                            const isBest=val===max&&max>0;
+                            return(
+                              <div key={t.id} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"0 8px"}}>
+                                <div style={{fontWeight:800,fontSize:15,color:isBest?C.primary:C.text}}>{val}{row.suffix||""}</div>
+                                <div style={{width:"100%",background:"#f1f5f9",borderRadius:99,height:5,overflow:"hidden"}}>
+                                  <div style={{width:`${pct}%`,height:"100%",background:isBest?C.primary:C.borderMd,borderRadius:99,transition:"width 0.5s"}}/>
+                                </div>
+                                {isBest&&max>0&&<div style={{fontSize:9,color:C.primary,fontWeight:700}}>🥇 melhor</div>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Ranking geral de líderes */}
+                  <h3 style={{fontSize:16,fontWeight:800,color:C.text,margin:"24px 0 16px"}}>🌟 Top 3 de Cada Turma</h3>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:16}}>
+                    {turmas.map(t=>{
+                      const rank=[...(t.alunos||[])].sort((a,b)=>b.pontos-a.pontos).slice(0,3);
+                      return(
+                        <div key={t.id} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,overflow:"hidden"}}>
+                          <div style={{background:t.id===turmaId?C.primary:"#f8f9fb",padding:"10px 14px"}}>
+                            <div style={{fontWeight:700,fontSize:14,color:t.id===turmaId?"#fff":C.text}}>{t.nome}</div>
+                          </div>
+                          {rank.length===0&&<div style={{padding:"16px 14px",color:C.textMuted,fontSize:13}}>Sem alunos</div>}
+                          {rank.map((a,i)=>{
+                            const nivel=getNivel(a.pontos);
+                            return(
+                              <div key={a.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderBottom:i<rank.length-1?`1px solid ${C.border}`:"none"}}>
+                                <div style={{fontWeight:900,fontSize:16,width:24,textAlign:"center"}}>{i===0?"🥇":i===1?"🥈":"🥉"}</div>
+                                <span style={{fontSize:18}}>{nivel.emoji}</span>
+                                <div style={{flex:1,minWidth:0}}>
+                                  <div style={{fontWeight:600,fontSize:13,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.nome}</div>
+                                  <div style={{fontSize:10,color:nivel.cor,fontWeight:700}}>{nivel.nome}</div>
+                                </div>
+                                <div style={{fontWeight:800,fontSize:13,color:nivel.cor,flexShrink:0}}>{a.pontos.toLocaleString()}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {turmas.length===1&&(
+                <div style={{background:"#f8f9fb",border:`1px dashed ${C.borderMd}`,borderRadius:14,padding:24,textAlign:"center",color:C.textMuted}}>
+                  <div style={{fontSize:32,marginBottom:8}}>📊</div>
+                  <div style={{fontWeight:700,fontSize:14,marginBottom:4}}>Comparação disponível com 2+ turmas</div>
+                  <div style={{fontSize:13}}>Crie outra turma para comparar o desempenho entre elas.</div>
+                </div>
+              )}
+            </div>
+          )}
+
           {aba==="ranking"&&(
             <div>
               <h2 style={{fontSize:20,fontWeight:800,color:C.text,marginBottom:20}}>🏆 Ranking de Aura</h2>
