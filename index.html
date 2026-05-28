@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Projeto Aura 👑</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👑</text></svg>"/>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; }
+body { background: #f1f5f9; font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+input::placeholder { color: #94a3b8; }
+input[type=number]::-webkit-inner-spin-button { opacity: 0.4; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+button { font-family: inherit; }
+button:active { transform: scale(0.97); }
+@keyframes toastIn { from { opacity:0; transform:translateX(-50%) translateY(-10px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 0.8s linear infinite; display: inline-block; }
+
+.app-layout { display: flex; min-height: 100vh; }
+.sidebar {
+  width: 240px; flex-shrink: 0;
+  background: #fff; border-right: 1px solid #e2e8f0;
+  display: flex; flex-direction: column;
+  position: fixed; left: 0; top: 0; bottom: 0;
+  z-index: 50; overflow-y: auto;
+}
+.main-content { margin-left: 240px; flex: 1; min-height: 100vh; display: flex; flex-direction: column; }
+.top-bar { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 14px 24px; position: sticky; top: 0; z-index: 40; box-shadow: 0 1px 4px #0000000a; }
+.page-content { padding: 24px; flex: 1; }
+.content-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; max-width: 1400px; }
+.content-single { max-width: 760px; }
+
+@media (max-width: 900px) {
+  .sidebar { width: 200px; }
+  .main-content { margin-left: 200px; }
+  .page-content { padding: 16px; }
+}
+@media (max-width: 640px) {
+  .sidebar { display: none; }
+  .main-content { margin-left: 0; padding-bottom: 70px; }
+  .top-bar { padding: 10px 14px; }
+  .page-content { padding: 12px; }
+  .content-grid { grid-template-columns: 1fr; gap: 12px; }
+  .mobile-nav { display: flex !important; }
+}
+.mobile-nav {
+  display: none;
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: #fff; border-top: 1px solid #e2e8f0;
+  z-index: 50; padding: 6px 0 10px;
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyAcyRbhvXvY-L1KFMg1sWO503T0wHa_nh8",
+  authDomain: "projeto-aura--prof-gabriel.firebaseapp.com",
+  projectId: "projeto-aura--prof-gabriel",
+  storageBucket: "projeto-aura--prof-gabriel.firebasestorage.app",
+  messagingSenderId: "321097687040",
+  appId: "1:321097687040:web:341f5112de3bc6c5edf8e5",
+  measurementId: "G-3FDVER9MX2"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db   = firebase.firestore();
+</script>
+
+<script type="text/babel" src="app.js"></script>
+</body>
+</html>
