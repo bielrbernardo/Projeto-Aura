@@ -220,7 +220,6 @@ function App() {
   const [usuario,setUsuario]=useState(undefined);
   const [turmas,setTurmas]=useState([]);
   const [turmaId,setTurmaId]=useState(null);
-  const turmaIdRef=useRef(null);
   const [aba,setAba]=useState("inicio");
   const [selId,setSelId]=useState(null);
   const [toast,setToast]=useState(null);
@@ -253,15 +252,15 @@ function App() {
     return db.collection("usuarios").doc(usuario.uid).collection("turmas").orderBy("criadaEm","asc").onSnapshot(snap=>{
       const lista=snap.docs.map(d=>({id:d.id,...d.data(),acoes:d.data().acoes||ACOES_PADRAO}));
       setTurmas(lista);
-      // Usa ref para não sofrer com closure stale — bug de trocar de turma
-      if(lista.length&&!turmaIdRef.current){
-        turmaIdRef.current=lista[0].id;
-        setTurmaIdSafe(lista[0].id);
-      }
+      // Só define turmaId se ainda não tiver nenhuma selecionada
+      setTurmaId(prev => {
+        if(!prev && lista.length) return lista[0].id;
+        return prev;
+      });
     });
   },[usuario?.uid]);
 
-  function setTurmaIdSafe(id){turmaIdRef.current=id;setTurmaId(id);}
+
   function showToast(msg,tipo="info"){clearTimeout(toastRef.current);setToast({msg,tipo});toastRef.current=setTimeout(()=>setToast(null),2800);}
 
   const turmaAtual=turmas.find(t=>t.id===turmaId)||turmas[0];
@@ -278,12 +277,12 @@ function App() {
 
   async function criarTurma(nome){
     const doc=await db.collection("usuarios").doc(usuario.uid).collection("turmas").add({nome:nome.trim(),alunos:[],historico:[],acoes:ACOES_PADRAO,criadaEm:firebase.firestore.FieldValue.serverTimestamp()});
-    setTurmaIdSafe(doc.id);setSelId(null);setAba("ranking");showToast(`Turma "${nome.trim()}" criada!`,"success");
+    setTurmaId(doc.id);setSelId(null);setAba("ranking");showToast(`Turma "${nome.trim()}" criada!`,"success");
   }
   async function deletarTurma(id){
     if(turmas.length===1){showToast("Precisa ter ao menos 1 turma!","error");return;}
     await turmaRef(id).delete();
-    const r=turmas.filter(t=>t.id!==id);setTurmaIdSafe(r[0]?.id||null);setSelId(null);showToast("Turma removida.","info");
+    const r=turmas.filter(t=>t.id!==id);setTurmaId(r[0]?.id||null);setSelId(null);showToast("Turma removida.","info");
   }
   async function renomearTurma(id,nome){if(nome?.trim()) await turmaRef(id).update({nome:nome.trim()});}
   async function adicionarAluno(nomeParam){
@@ -407,7 +406,7 @@ function App() {
               <button onClick={()=>{setMData({});setModal("novaTurma");}} style={{background:C.primaryBg,border:"none",borderRadius:6,color:C.primary,fontWeight:800,fontSize:18,cursor:"pointer",width:26,height:26,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
             </div>
             {turmas.map(t=>(
-              <button key={t.id} onClick={()=>{setTurmaIdSafe(t.id);setSelId(null);setAba("ranking");}}
+              <button key={t.id} onClick={()=>{setTurmaId(t.id);setSelId(null);setAba("ranking");}}
                 style={{display:"block",width:"100%",padding:"7px 12px",background:t.id===turmaId?C.primary:"#f1f5f9",border:"none",borderRadius:9,color:t.id===turmaId?"#fff":C.textSub,fontWeight:t.id===turmaId?700:500,fontSize:13,cursor:"pointer",textAlign:"left",marginBottom:4,transition:"all 0.15s"}}>
                 {t.nome}
               </button>
@@ -475,7 +474,7 @@ function App() {
                   const infinitos=alns.filter(a=>getNivel(a.pontos).id===7).length;
                   const isAtual=t.id===turmaId;
                   return(
-                    <div key={t.id} onClick={()=>{setTurmaIdSafe(t.id);setAba("ranking");}}
+                    <div key={t.id} onClick={()=>{setTurmaId(t.id);setAba("ranking");}}
                       style={{background:C.card,border:`2px solid ${isAtual?C.primary:C.border}`,borderRadius:16,padding:20,cursor:"pointer",transition:"all 0.2s",boxShadow:isAtual?`0 4px 20px ${C.primary}20`:"0 1px 4px #0000000a"}}
                       onMouseEnter={e=>e.currentTarget.style.boxShadow=`0 4px 20px ${C.primary}20`}
                       onMouseLeave={e=>e.currentTarget.style.boxShadow=isAtual?`0 4px 20px ${C.primary}20`:"0 1px 4px #0000000a"}>
