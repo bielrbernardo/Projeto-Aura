@@ -23,7 +23,7 @@ const NIVEIS = [
   { id:5, nome:"Aura Suprema",  emoji:"👑", cor:"#ca8a04", bg:"#fef9c3", stars:4, frase:"participa e respeita",                 min:1200,max:1599 },
   { id:6, nome:"Aura Lendária", emoji:"🌟", cor:"#0891b2", bg:"#cffafe", stars:5, frase:"referência da turma",                  min:1600,max:1999 },
   { id:7, nome:"Aura Infinita", emoji:"✨", cor:"#16a34a", bg:"#dcfce7", stars:5, frase:"o professor quase chorou de orgulho 😂",min:2000,max:2999 },
-  { id:8, nome:"Aura Ego",      emoji:"🔱", cor:"#7c3aed", bg:"#ede9fe", stars:5, frase:"virou lenda da escola 😎",             min:3000,max:Infinity },
+  { id:8, nome:"Aura + Ego",      emoji:"🔱", cor:"#7c3aed", bg:"#ede9fe", stars:5, frase:"virou lenda da escola 😎",             min:3000,max:Infinity },
 ];
 
 const BIMESTRES = [
