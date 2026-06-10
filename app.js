@@ -15,14 +15,22 @@ const C = {
 
 // ─── NÍVEIS ───────────────────────────────────────────────────────────────────
 const NIVEIS = [
-  { id:0, nome:"Aura Betinha",  emoji:"🤡", cor:"#e11d48", bg:"#fff1f2", stars:0, frase:"precisa focar mais",                    min:0,    max:199   },
-  { id:1, nome:"Aura Básica",   emoji:"🛡️", cor:"#b45309", bg:"#fef3c7", stars:1, frase:"sobreviveu à aula",                    min:200,  max:499   },
-  { id:2, nome:"Aura Bronze",   emoji:"🥉", cor:"#92400e", bg:"#fde8d8", stars:1, frase:"começando a se engajar",               min:500,  max:999   },
-  { id:3, nome:"Aura Rara",     emoji:"💎", cor:"#7c3aed", bg:"#ede9fe", stars:2, frase:"participa às vezes",                   min:1000, max:1799  },
-  { id:4, nome:"Aura Épica",    emoji:"🔷", cor:"#0284c7", bg:"#e0f2fe", stars:3, frase:"ajuda colegas",                        min:1800, max:2999  },
-  { id:5, nome:"Aura Suprema",  emoji:"👑", cor:"#ca8a04", bg:"#fef9c3", stars:4, frase:"participa e respeita",                 min:3000, max:4499  },
-  { id:6, nome:"Aura Lendária", emoji:"🌟", cor:"#0891b2", bg:"#cffafe", stars:5, frase:"referência da turma",                  min:4500, max:6499  },
-  { id:7, nome:"Aura Infinita", emoji:"✨", cor:"#16a34a", bg:"#dcfce7", stars:5, frase:"o professor quase chorou de orgulho 😂",min:6500, max:Infinity },
+  { id:0, nome:"Aura Betinha",  emoji:"🤡", cor:"#e11d48", bg:"#fff1f2", stars:0, frase:"precisa focar mais",                    min:0,   max:99   },
+  { id:1, nome:"Aura Básica",   emoji:"🛡️", cor:"#b45309", bg:"#fef3c7", stars:1, frase:"sobreviveu à aula",                    min:100, max:249  },
+  { id:2, nome:"Aura Bronze",   emoji:"🥉", cor:"#92400e", bg:"#fde8d8", stars:1, frase:"começando a se engajar",               min:250, max:499  },
+  { id:3, nome:"Aura Rara",     emoji:"💎", cor:"#7c3aed", bg:"#ede9fe", stars:2, frase:"participa às vezes",                   min:500, max:849  },
+  { id:4, nome:"Aura Épica",    emoji:"🔷", cor:"#0284c7", bg:"#e0f2fe", stars:3, frase:"ajuda colegas",                        min:850, max:1199 },
+  { id:5, nome:"Aura Suprema",  emoji:"👑", cor:"#ca8a04", bg:"#fef9c3", stars:4, frase:"participa e respeita",                 min:1200,max:1599 },
+  { id:6, nome:"Aura Lendária", emoji:"🌟", cor:"#0891b2", bg:"#cffafe", stars:5, frase:"referência da turma",                  min:1600,max:1999 },
+  { id:7, nome:"Aura Infinita", emoji:"✨", cor:"#16a34a", bg:"#dcfce7", stars:5, frase:"o professor quase chorou de orgulho 😂",min:2000,max:2999 },
+  { id:8, nome:"Aura Ego",      emoji:"🔱", cor:"#7c3aed", bg:"#ede9fe", stars:5, frase:"virou lenda da escola 😎",             min:3000,max:Infinity },
+];
+
+const BIMESTRES = [
+  { id:1, label:"1º Bimestre", cor:"#6366f1", bg:"#eef2ff" },
+  { id:2, label:"2º Bimestre", cor:"#0891b2", bg:"#cffafe" },
+  { id:3, label:"3º Bimestre", cor:"#16a34a", bg:"#dcfce7" },
+  { id:4, label:"4º Bimestre", cor:"#ca8a04", bg:"#fef9c3" },
 ];
 
 const ACOES_PADRAO = [
@@ -219,6 +227,7 @@ function TelaLogin() {
 function App() {
   const [usuario,setUsuario]=useState(undefined);
   const [turmas,setTurmas]=useState([]);
+  const [bimestre,setBimestre]=useState(2);
   const [turmaId,setTurmaId]=useState(null);
   const [aba,setAba]=useState("inicio");
   const [selId,setSelId]=useState(null);
@@ -253,12 +262,13 @@ function App() {
     if(!usuario?.uid) return;
     iniciouTurma.current = false;
     return db.collection("usuarios").doc(usuario.uid).collection("turmas").orderBy("criadaEm","asc").onSnapshot(snap=>{
-      const lista=snap.docs.map(d=>({id:d.id,...d.data(),acoes:d.data().acoes||ACOES_PADRAO}));
+      const lista=snap.docs.map(d=>({id:d.id,...d.data(),acoes:d.data().acoes||ACOES_PADRAO,bimestre:d.data().bimestre||2}));
       setTurmas(lista);
       // Só seleciona a primeira turma UMA VEZ ao carregar
       if(!iniciouTurma.current && lista.length){
         iniciouTurma.current = true;
-        setTurmaId(lista[0].id);
+        const primeiraDoBimestre = lista.filter(t=>(t.bimestre||2)===2)[0] || lista[0];
+        setTurmaId(primeiraDoBimestre.id);
       }
     });
   },[usuario?.uid]);
@@ -266,7 +276,8 @@ function App() {
 
   function showToast(msg,tipo="info"){clearTimeout(toastRef.current);setToast({msg,tipo});toastRef.current=setTimeout(()=>setToast(null),2800);}
 
-  const turmaAtual=turmas.find(t=>t.id===turmaId)||turmas[0];
+  const turmasDoBimestre = turmas.filter(t=>(t.bimestre||2)===bimestre);
+  const turmaAtual=turmas.find(t=>t.id===turmaId)||turmasDoBimestre[0]||turmas[0];
   const alunos=turmaAtual?.alunos||[];
   const historico=turmaAtual?.historico||[];
   const acoes=turmaAtual?.acoes||[];
@@ -279,9 +290,50 @@ function App() {
   function turmaRef(id){return db.collection("usuarios").doc(usuario.uid).collection("turmas").doc(id||turmaAtual?.id);}
 
   async function criarTurma(nome){
-    const doc=await db.collection("usuarios").doc(usuario.uid).collection("turmas").add({nome:nome.trim(),alunos:[],historico:[],acoes:ACOES_PADRAO,criadaEm:firebase.firestore.FieldValue.serverTimestamp()});
-    setTurmaId(doc.id);setSelId(null);setAba("ranking");showToast(`Turma "${nome.trim()}" criada!`,"success");
+    const doc=await db.collection("usuarios").doc(usuario.uid).collection("turmas").add({nome:nome.trim(),alunos:[],historico:[],acoes:ACOES_PADRAO,bimestre,criadoEm:firebase.firestore.FieldValue.serverTimestamp(),criadaEm:firebase.firestore.FieldValue.serverTimestamp()});
+    setTurmaId(doc.id);setSelId(null);setAba("ranking");showToast(`Turma "${nome.trim()}" criada no ${BIMESTRES.find(b=>b.id===bimestre)?.label}!`,"success");
   }
+  async function trocarBimestre(novoBimestre){
+    if(novoBimestre === bimestre) return;
+    const confirma = window.confirm(`Trocar para o ${BIMESTRES.find(b=>b.id===novoBimestre)?.label}?
+
+Os pontos das turmas do bimestre atual serão zerados ao migrar. Os alunos permanecem.`);
+    if(!confirma) return;
+    setBimestre(novoBimestre);
+    iniciouTurma.current = false;
+    // Seleciona primeira turma do novo bimestre se existir
+    const turmasNovoBim = turmas.filter(t=>(t.bimestre||2)===novoBimestre);
+    if(turmasNovoBim.length){
+      setTurmaId(turmasNovoBim[0].id);
+    } else {
+      setTurmaId(null);
+      iniciouTurma.current = false;
+    }
+    setSelId(null);
+    setAba("inicio");
+    showToast(`${BIMESTRES.find(b=>b.id===novoBimestre)?.label} selecionado!`,"success");
+  }
+
+  async function migrarTurmaParaBimestre(turmaOrigId, novoBimestre){
+    const turmaOrig = turmas.find(t=>t.id===turmaOrigId);
+    if(!turmaOrig) return;
+    // Cria nova cópia da turma no novo bimestre com pontos zerados
+    const novosAlunos = turmaOrig.alunos.map(a=>({...a, pontos:0}));
+    const doc = await db.collection("usuarios").doc(usuario.uid).collection("turmas").add({
+      nome: turmaOrig.nome,
+      alunos: novosAlunos,
+      historico: [],
+      acoes: turmaOrig.acoes || ACOES_PADRAO,
+      bimestre: novoBimestre,
+      criadaEm: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    setBimestre(novoBimestre);
+    setTurmaId(doc.id);
+    setSelId(null);
+    setAba("ranking");
+    showToast(`Turma migrada para o ${BIMESTRES.find(b=>b.id===novoBimestre)?.label}! Pontos zerados.`,"success");
+  }
+
   async function deletarTurma(id){
     if(turmas.length===1){showToast("Precisa ter ao menos 1 turma!","error");return;}
     await turmaRef(id).delete();
@@ -399,21 +451,34 @@ function App() {
       {/* SIDEBAR */}
       <aside className="sidebar">
         <div style={{padding:"20px 16px 12px"}}>
-          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:20}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
             <div style={{fontSize:28}}>👑</div>
             <div><div style={{fontWeight:900,fontSize:15,color:C.text}}>Projeto Aura</div><div style={{fontSize:10,color:C.textMuted}}>Gamificação Escolar</div></div>
+          </div>
+          {/* Seletor de Bimestre */}
+          <div style={{marginBottom:16}}>
+            <Label style={{marginBottom:6}}>Bimestre</Label>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4}}>
+              {BIMESTRES.map(b=>(
+                <button key={b.id} onClick={()=>trocarBimestre(b.id)}
+                  style={{background:bimestre===b.id?b.cor:"#f1f5f9",border:"none",borderRadius:8,padding:"6px 4px",color:bimestre===b.id?"#fff":C.textSub,fontWeight:700,fontSize:11,cursor:"pointer",transition:"all 0.15s",textAlign:"center"}}>
+                  {b.label.replace(" Bimestre","º Bim")}
+                </button>
+              ))}
+            </div>
           </div>
           <div style={{marginBottom:16}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
               <Label style={{marginBottom:0}}>Turmas</Label>
               <button onClick={()=>{setMData({});setModal("novaTurma");}} style={{background:C.primaryBg,border:"none",borderRadius:6,color:C.primary,fontWeight:800,fontSize:18,cursor:"pointer",width:26,height:26,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
             </div>
-            {turmas.map(t=>(
+            {turmasDoBimestre.map(t=>(
               <button key={t.id} onClick={()=>{setTurmaId(t.id);setSelId(null);setAba("ranking");}}
                 style={{display:"block",width:"100%",padding:"7px 12px",background:t.id===turmaId?C.primary:"#f1f5f9",border:"none",borderRadius:9,color:t.id===turmaId?"#fff":C.textSub,fontWeight:t.id===turmaId?700:500,fontSize:13,cursor:"pointer",textAlign:"left",marginBottom:4,transition:"all 0.15s"}}>
                 {t.nome}
               </button>
             ))}
+            {turmasDoBimestre.length===0&&<div style={{fontSize:12,color:C.textMuted,padding:"8px 4px",fontStyle:"italic"}}>Nenhuma turma neste bimestre</div>}
           </div>
           <div style={{height:1,background:C.border,marginBottom:12}}/>
           {ABAS.map(item=><NavItem key={item.id} item={item}/>)}
@@ -446,7 +511,10 @@ function App() {
                   </>}
                 </div>
               )}
-              <div style={{fontSize:11,color:C.textMuted,marginTop:2}}>{ABAS.find(a=>a.id===aba)?.icon} {ABAS.find(a=>a.id===aba)?.label} · {alunos.length} alunos</div>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginTop:3,flexWrap:"wrap"}}>
+                <span style={{fontSize:11,color:C.textMuted}}>{ABAS.find(a=>a.id===aba)?.icon} {ABAS.find(a=>a.id===aba)?.label} · {alunos.length} alunos</span>
+                <span style={{background:BIMESTRES.find(b=>b.id===bimestre)?.bg,color:BIMESTRES.find(b=>b.id===bimestre)?.cor,borderRadius:99,padding:"1px 8px",fontSize:10,fontWeight:700}}>{BIMESTRES.find(b=>b.id===bimestre)?.label}</span>
+              </div>
             </div>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
               <div style={{width:34,height:34,borderRadius:50,background:C.primaryBg,border:`2px solid ${C.primary}`,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:15,color:C.primary}}>{usuario.nome.charAt(0).toUpperCase()}</div>
@@ -466,7 +534,7 @@ function App() {
 
               {/* Cards resumo por turma */}
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:16,marginBottom:32}}>
-                {turmas.map(t=>{
+                {turmasDoBimestre.map(t=>{
                   const alns=t.alunos||[];
                   const hist=t.historico||[];
                   const rank=[...alns].sort((a,b)=>b.pontos-a.pontos);
@@ -474,7 +542,7 @@ function App() {
                   const lider=rank[0];
                   const nivelLider=lider?getNivel(lider.pontos):null;
                   const negativos=alns.filter(a=>a.pontos<0).length;
-                  const infinitos=alns.filter(a=>getNivel(a.pontos).id===7).length;
+                  const infinitos=alns.filter(a=>getNivel(a.pontos).id===8).length;
                   const isAtual=t.id===turmaId;
                   return(
                     <div key={t.id} onClick={()=>{setTurmaId(t.id);setAba("ranking");}}
@@ -519,14 +587,14 @@ function App() {
               </div>
 
               {/* Comparação de turmas */}
-              {turmas.length>1&&(
+              {turmasDoBimestre.length>1&&(
                 <div>
                   <h3 style={{fontSize:16,fontWeight:800,color:C.text,marginBottom:16}}>📊 Comparação entre Turmas</h3>
                   <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,overflow:"hidden"}}>
                     {/* Header */}
-                    <div style={{display:"grid",gridTemplateColumns:`180px repeat(${turmas.length},1fr)`,background:"#f8f9fb",borderBottom:`1px solid ${C.border}`,padding:"10px 16px"}}>
+                    <div style={{display:"grid",gridTemplateColumns:`180px repeat(${turmasDoBimestre.length},1fr)`,background:"#f8f9fb",borderBottom:`1px solid ${C.border}`,padding:"10px 16px"}}>
                       <div style={{fontSize:11,fontWeight:700,color:C.textMuted,textTransform:"uppercase"}}>Indicador</div>
-                      {turmas.map(t=>(
+                      {turmasDoBimestre.map(t=>(
                         <div key={t.id} style={{fontSize:12,fontWeight:700,color:t.id===turmaId?C.primary:C.text,textAlign:"center",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.nome}</div>
                       ))}
                     </div>
@@ -535,17 +603,17 @@ function App() {
                       {label:"👥 Total alunos",    fn:t=>(t.alunos||[]).length},
                       {label:"📊 Média de Aura",   fn:t=>{const a=t.alunos||[];return a.length?Math.round(a.reduce((s,x)=>s+x.pontos,0)/a.length):0;},suffix:" pts"},
                       {label:"🏆 Maior Aura",      fn:t=>{const r=[...(t.alunos||[])].sort((a,b)=>b.pontos-a.pontos);return r[0]?.pontos||0;},suffix:" pts"},
-                      {label:"✨ Aura Infinita",   fn:t=>(t.alunos||[]).filter(a=>getNivel(a.pontos).id===7).length},
-                      {label:"👑 Aura Suprema+",   fn:t=>(t.alunos||[]).filter(a=>getNivel(a.pontos).id>=5).length},
+                      {label:"✨ Aura Infinita",   fn:t=>(t.alunos||[]).filter(a=>getNivel(a.pontos).id===8).length},
+                      {label:"👑 Aura Suprema+",   fn:t=>(t.alunos||[]).filter(a=>getNivel(a.pontos).id>=6).length},
                       {label:"💔 Aura Negativa",   fn:t=>(t.alunos||[]).filter(a=>a.pontos<0).length},
                       {label:"📋 Ações registradas",fn:t=>(t.historico||[]).length},
                     ].map((row,ri)=>{
-                      const vals=turmas.map(t=>row.fn(t));
+                      const vals=turmasDoBimestre.map(t=>row.fn(t));
                       const max=Math.max(...vals,1);
                       return(
                         <div key={ri} style={{display:"grid",gridTemplateColumns:`180px repeat(${turmas.length},1fr)`,padding:"12px 16px",borderBottom:ri<6?`1px solid ${C.border}`:"none",background:ri%2===0?"#fff":"#fafafa"}}>
                           <div style={{fontSize:12,fontWeight:600,color:C.textSub,display:"flex",alignItems:"center"}}>{row.label}</div>
-                          {turmas.map((t,ti)=>{
+                          {turmasDoBimestre.map((t,ti)=>{
                             const val=vals[ti];
                             const pct=max>0?(val/max)*100:0;
                             const isBest=val===max&&max>0;
@@ -567,7 +635,7 @@ function App() {
                   {/* Ranking geral de líderes */}
                   <h3 style={{fontSize:16,fontWeight:800,color:C.text,margin:"24px 0 16px"}}>🌟 Top 3 de Cada Turma</h3>
                   <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:16}}>
-                    {turmas.map(t=>{
+                    {turmasDoBimestre.map(t=>{
                       const rank=[...(t.alunos||[])].sort((a,b)=>b.pontos-a.pontos).slice(0,3);
                       return(
                         <div key={t.id} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,overflow:"hidden"}}>
@@ -596,7 +664,7 @@ function App() {
                 </div>
               )}
 
-              {turmas.length===1&&(
+              {turmasDoBimestre.length===1&&(
                 <div style={{background:"#f8f9fb",border:`1px dashed ${C.borderMd}`,borderRadius:14,padding:24,textAlign:"center",color:C.textMuted}}>
                   <div style={{fontSize:32,marginBottom:8}}>📊</div>
                   <div style={{fontWeight:700,fontSize:14,marginBottom:4}}>Comparação disponível com 2+ turmas</div>
@@ -653,7 +721,7 @@ function App() {
                     <Card style={{marginTop:16}}>
                       <Label>Estatísticas</Label>
                       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                        {[["🏅","Maior Aura",ranking[0]?`${ranking[0].pontos.toLocaleString()} pts`:"—"],["📊","Média",`${Math.round(alunos.reduce((s,a)=>s+a.pontos,0)/alunos.length).toLocaleString()} pts`],["👥","Total",alunos.length],["✨","Infinita",alunos.filter(a=>getNivel(a.pontos).id===7).length]].map(([icon,label,val])=>(
+                        {[["🏅","Maior Aura",ranking[0]?`${ranking[0].pontos.toLocaleString()} pts`:"—"],["📊","Média",`${Math.round(alunos.reduce((s,a)=>s+a.pontos,0)/alunos.length).toLocaleString()} pts`],["👥","Total",alunos.length],["✨","Infinita",alunos.filter(a=>getNivel(a.pontos).id===8).length]].map(([icon,label,val])=>(
                           <div key={label} style={{background:"#f8f9fb",borderRadius:10,padding:"12px 14px"}}>
                             <div style={{fontSize:20,marginBottom:4}}>{icon}</div>
                             <div style={{fontSize:11,color:C.textMuted}}>{label}</div>
@@ -865,7 +933,19 @@ function App() {
           {/* ALUNOS */}
           {aba==="alunos"&&(
             <div>
-              <h2 style={{fontSize:20,fontWeight:800,color:C.text,marginBottom:20}}>👥 Gerenciar Alunos</h2>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,flexWrap:"wrap",gap:10}}>
+              <h2 style={{fontSize:20,fontWeight:800,color:C.text}}>👥 Gerenciar Alunos</h2>
+              {bimestre < 4 && turmaAtual && (
+                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                  {BIMESTRES.filter(b=>b.id>bimestre).map(b=>(
+                    <button key={b.id} onClick={()=>migrarTurmaParaBimestre(turmaAtual.id, b.id)}
+                      style={{background:b.bg,border:`1.5px solid ${b.cor}`,borderRadius:10,padding:"7px 14px",color:b.cor,fontWeight:700,fontSize:12,cursor:"pointer"}}>
+                      📦 Migrar para {b.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
               <div className="content-grid">
                 <div>
                   <Card style={{marginBottom:16}}>
