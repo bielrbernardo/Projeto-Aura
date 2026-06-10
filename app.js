@@ -277,7 +277,8 @@ function App() {
   function showToast(msg,tipo="info"){clearTimeout(toastRef.current);setToast({msg,tipo});toastRef.current=setTimeout(()=>setToast(null),2800);}
 
   const turmasDoBimestre = turmas.filter(t=>(t.bimestre||2)===bimestre);
-  const turmaAtual=turmas.find(t=>t.id===turmaId)||turmasDoBimestre[0]||turmas[0];
+  // turmaAtual deve sempre ser do bimestre selecionado
+  const turmaAtual = turmasDoBimestre.find(t=>t.id===turmaId) || turmasDoBimestre[0] || null;
   const alunos=turmaAtual?.alunos||[];
   const historico=turmaAtual?.historico||[];
   const acoes=turmaAtual?.acoes||[];
@@ -287,28 +288,21 @@ function App() {
   const proxNivel=nivelSel?NIVEIS[Math.min(NIVEIS.length-1,nivelSel.id+1)]:null;
   const histAluno=historico.filter(h=>h.alunoId===selId);
 
-  function turmaRef(id){return db.collection("usuarios").doc(usuario.uid).collection("turmas").doc(id||turmaAtual?.id);}
+  function turmaRef(id){
+    const tid = id || turmaAtual?.id;
+    if(!tid) throw new Error("Nenhuma turma selecionada");
+    return db.collection("usuarios").doc(usuario.uid).collection("turmas").doc(tid);
+  }
 
   async function criarTurma(nome){
     const doc=await db.collection("usuarios").doc(usuario.uid).collection("turmas").add({nome:nome.trim(),alunos:[],historico:[],acoes:ACOES_PADRAO,bimestre,criadoEm:firebase.firestore.FieldValue.serverTimestamp(),criadaEm:firebase.firestore.FieldValue.serverTimestamp()});
     setTurmaId(doc.id);setSelId(null);setAba("ranking");showToast(`Turma "${nome.trim()}" criada no ${BIMESTRES.find(b=>b.id===bimestre)?.label}!`,"success");
   }
-  async function trocarBimestre(novoBimestre){
+  function trocarBimestre(novoBimestre){
     if(novoBimestre === bimestre) return;
-    const confirma = window.confirm(`Trocar para o ${BIMESTRES.find(b=>b.id===novoBimestre)?.label}?
-
-Os pontos das turmas do bimestre atual serão zerados ao migrar. Os alunos permanecem.`);
-    if(!confirma) return;
     setBimestre(novoBimestre);
-    iniciouTurma.current = false;
-    // Seleciona primeira turma do novo bimestre se existir
     const turmasNovoBim = turmas.filter(t=>(t.bimestre||2)===novoBimestre);
-    if(turmasNovoBim.length){
-      setTurmaId(turmasNovoBim[0].id);
-    } else {
-      setTurmaId(null);
-      iniciouTurma.current = false;
-    }
+    setTurmaId(turmasNovoBim.length ? turmasNovoBim[0].id : null);
     setSelId(null);
     setAba("inicio");
     showToast(`${BIMESTRES.find(b=>b.id===novoBimestre)?.label} selecionado!`,"success");
@@ -317,7 +311,9 @@ Os pontos das turmas do bimestre atual serão zerados ao migrar. Os alunos perma
   async function migrarTurmaParaBimestre(turmaOrigId, novoBimestre){
     const turmaOrig = turmas.find(t=>t.id===turmaOrigId);
     if(!turmaOrig) return;
-    // Cria nova cópia da turma no novo bimestre com pontos zerados
+    const bimLabel = BIMESTRES.find(b=>b.id===novoBimestre)?.label;
+    const confirma = window.confirm(`Migrar "${turmaOrig.nome}" para o ${bimLabel}?\n\nOs alunos serão copiados com pontos zerados. A turma original permanece intacta.`);
+    if(!confirma) return;
     const novosAlunos = turmaOrig.alunos.map(a=>({...a, pontos:0}));
     const doc = await db.collection("usuarios").doc(usuario.uid).collection("turmas").add({
       nome: turmaOrig.nome,
@@ -331,7 +327,7 @@ Os pontos das turmas do bimestre atual serão zerados ao migrar. Os alunos perma
     setTurmaId(doc.id);
     setSelId(null);
     setAba("ranking");
-    showToast(`Turma migrada para o ${BIMESTRES.find(b=>b.id===novoBimestre)?.label}! Pontos zerados.`,"success");
+    showToast(`Turma migrada para o ${bimLabel}! Pontos zerados.`,"success");
   }
 
   async function deletarTurma(id){
