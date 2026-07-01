@@ -137,13 +137,20 @@ function TelaLogin() {
   const [showPw,setShowPw]=useState(false);
   const [loading,setLoading]=useState(false);
   function ir(t){setErro("");setSucesso("");setTela(t);}
+  function comTimeout(promise,ms=12000){
+    return Promise.race([
+      promise,
+      new Promise((_,reject)=>setTimeout(()=>reject({code:"timeout",message:"Tempo esgotado"}),ms))
+    ]);
+  }
 
   async function handleLogin(){
     setErro("");setLoading(true);
-    try{ await auth.signInWithEmailAndPassword(email.trim(),senha); }
+    try{ await comTimeout(auth.signInWithEmailAndPassword(email.trim(),senha)); }
     catch(e){
-      const m={"auth/user-not-found":"E-mail não cadastrado.","auth/wrong-password":"Senha incorreta.","auth/invalid-credential":"E-mail ou senha incorretos.","auth/invalid-email":"E-mail inválido."};
-      setErro(m[e.code]||"Erro ao entrar.");
+      console.error("Aura: erro no login:",e.code,e.message);
+      const m={"auth/user-not-found":"E-mail não cadastrado.","auth/wrong-password":"Senha incorreta.","auth/invalid-credential":"E-mail ou senha incorretos.","auth/invalid-email":"E-mail inválido.","timeout":"Tempo esgotado. Verifique sua internet — o Firebase pode estar bloqueado nesta rede/wi-fi."};
+      setErro(m[e.code]||`Erro ao entrar (${e.code||"desconhecido"}).`);
     }
     setLoading(false);
   }
@@ -154,12 +161,13 @@ function TelaLogin() {
     if(senha!==senha2){setErro("As senhas não coincidem.");return;}
     setLoading(true);
     try{
-      const c=await auth.createUserWithEmailAndPassword(email.trim(),senha);
+      const c=await comTimeout(auth.createUserWithEmailAndPassword(email.trim(),senha));
       await c.user.updateProfile({displayName:nome.trim()});
       await db.collection("usuarios").doc(c.user.uid).set({nome:nome.trim(),email:email.trim(),criadoEm:firebase.firestore.FieldValue.serverTimestamp()});
     }catch(e){
-      const m={"auth/email-already-in-use":"E-mail já cadastrado.","auth/invalid-email":"E-mail inválido.","auth/weak-password":"Senha muito fraca."};
-      setErro(m[e.code]||"Erro ao criar conta.");
+      console.error("Aura: erro no cadastro:",e.code,e.message);
+      const m={"auth/email-already-in-use":"E-mail já cadastrado.","auth/invalid-email":"E-mail inválido.","auth/weak-password":"Senha muito fraca.","timeout":"Tempo esgotado. Verifique sua internet — o Firebase pode estar bloqueado nesta rede/wi-fi."};
+      setErro(m[e.code]||`Erro ao criar conta (${e.code||"desconhecido"}).`);
     }
     setLoading(false);
   }
@@ -187,8 +195,12 @@ function TelaLogin() {
   }
   async function handleRecuperar(){
     setErro("");setLoading(true);
-    try{await auth.sendPasswordResetEmail(email.trim());setSucesso("E-mail de recuperação enviado!");}
-    catch(e){setErro("E-mail não encontrado.");}
+    try{await comTimeout(auth.sendPasswordResetEmail(email.trim()));setSucesso("E-mail de recuperação enviado!");}
+    catch(e){
+      console.error("Aura: erro ao recuperar senha:",e.code,e.message);
+      const m={"timeout":"Tempo esgotado. Verifique sua internet — o Firebase pode estar bloqueado nesta rede/wi-fi."};
+      setErro(m[e.code]||"E-mail não encontrado.");
+    }
     setLoading(false);
   }
 
@@ -307,6 +319,9 @@ function App() {
         const primeiraDoBimestre = lista.filter(t=>(t.bimestre||2)===2)[0] || lista[0];
         setTurmaId(primeiraDoBimestre.id);
       }
+    }, erro=>{
+      console.error("Aura: erro ao carregar turmas do Firestore:",erro.code,erro.message);
+      showToast(`Erro ao carregar turmas (${erro.code||"desconhecido"}). Veja o console (F12).`,"error");
     });
   },[usuario?.uid]);
 
