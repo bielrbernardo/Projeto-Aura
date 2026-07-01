@@ -50,7 +50,7 @@ const ACOES_PADRAO = [
 
 const EMOJIS = ["🎯","⭐","🔥","💡","🏅","🎮","📚","✏️","🧠","🤖","🎵","🏆","🌟","⚡","🚀","🤝","💪","📋","🙋","❌","💀","🔴","😤","🥳","🎉","🌈","💎","👑","✨","📝","🤲","📵","🏃","🎤","🖥️"];
 const CORES  = [{cor:"#16a34a",bg:"#dcfce7"},{cor:"#2563eb",bg:"#dbeafe"},{cor:"#7c3aed",bg:"#ede9fe"},{cor:"#ca8a04",bg:"#fef9c3"},{cor:"#e11d48",bg:"#fff1f2"},{cor:"#ea580c",bg:"#ffedd5"},{cor:"#dc2626",bg:"#fee2e2"},{cor:"#0891b2",bg:"#cffafe"},{cor:"#6366f1",bg:"#eef2ff"},{cor:"#0f766e",bg:"#ccfbf1"}];
-const ABAS   = [{id:"inicio",icon:"🏠",label:"Início"},{id:"ranking",icon:"🏆",label:"Ranking"},{id:"registrar",icon:"⚡",label:"Registrar"},{id:"alunos",icon:"👥",label:"Alunos"},{id:"acoes",icon:"🎯",label:"Ações"},{id:"historico",icon:"📋",label:"Histórico"}];
+const ABAS   = [{id:"inicio",icon:"🏠",label:"Início"},{id:"ranking",icon:"🏆",label:"Ranking"},{id:"notas",icon:"📊",label:"Notas"},{id:"registrar",icon:"⚡",label:"Registrar"},{id:"alunos",icon:"👥",label:"Alunos"},{id:"acoes",icon:"🎯",label:"Ações"},{id:"historico",icon:"📋",label:"Histórico"}];
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
 function getNivel(p) {
@@ -244,6 +244,7 @@ function App() {
   const [modoMassa,setModoMassa]=useState(false);
   const [acaoMassa,setAcaoMassa]=useState(null);
   const [alunosMassa,setAlunosMassa]=useState(new Set());
+  const [cfgForm,setCfgForm]=useState({metaAura:1500,metaAtividades:20,pesoAura:50});
   const fileRef=useRef();
   const toastRef=useRef();
 
@@ -275,6 +276,11 @@ function App() {
 
 
   function showToast(msg,tipo="info"){clearTimeout(toastRef.current);setToast({msg,tipo});toastRef.current=setTimeout(()=>setToast(null),2800);}
+
+  useEffect(()=>{
+    const cfg=turmaAtual?.configNotas;
+    setCfgForm(cfg?{metaAura:cfg.metaAura,metaAtividades:cfg.metaAtividades,pesoAura:Math.round(cfg.pesoAura*100)}:{metaAura:1500,metaAtividades:20,pesoAura:50});
+  },[turmaAtual?.id]);
 
   const turmasDoBimestre = turmas.filter(t=>(t.bimestre||2)===bimestre);
   // turmaAtual deve sempre ser do bimestre selecionado
@@ -432,6 +438,20 @@ function App() {
   }
   function abrirNovaAcao(){setFormAcao({label:"",valor:"",icon:"🎯",cor:C.green,corBg:C.greenBg,tipo:"positivo"});setMData({});setModal("acao");}
   function abrirEditAcao(a){setFormAcao({label:a.label,valor:String(Math.abs(a.valor)),icon:a.icon,cor:a.cor,corBg:a.corBg||C.primaryBg,tipo:a.valor<0?"negativo":"positivo"});setMData({editId:a.id,custom:a.custom});setModal("acao");}
+
+  // ─── NOTAS (calculadas a partir da Aura + atividades realizadas no bimestre) ───
+  const configNotas = turmaAtual?.configNotas || {metaAura:1500, metaAtividades:20, pesoAura:0.5};
+  function calcularNota(aluno){
+    const qtdAtividades = historico.filter(h=>h.alunoId===aluno.id && h.valor>0).length;
+    const notaAura = Math.min(10, Math.max(0, configNotas.metaAura>0 ? (aluno.pontos/configNotas.metaAura)*10 : 0));
+    const notaAtividades = Math.min(10, Math.max(0, configNotas.metaAtividades>0 ? (qtdAtividades/configNotas.metaAtividades)*10 : 0));
+    const notaFinal = notaAura*configNotas.pesoAura + notaAtividades*(1-configNotas.pesoAura);
+    return {qtdAtividades, notaAura, notaAtividades, notaFinal};
+  }
+  async function salvarConfigNotas(cfg){
+    await turmaRef().update({configNotas:cfg});
+    showToast("Configuração de notas salva!","success");
+  }
 
   if(usuario===undefined)return <Spinner/>;
   if(!usuario)return <TelaLogin/>;
@@ -729,6 +749,56 @@ function App() {
                   )}
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* NOTAS */}
+          {aba==="notas"&&(
+            <div>
+              <h2 style={{fontSize:20,fontWeight:800,color:C.text,marginBottom:6}}>📊 Notas do Bimestre</h2>
+              <div style={{fontSize:12,color:C.textSub,marginBottom:20,maxWidth:640}}>
+                A nota é calculada automaticamente, sem digitação manual: <b>{Math.round(configNotas.pesoAura*100)}%</b> vem da pontuação de Aura do aluno e <b>{Math.round((1-configNotas.pesoAura)*100)}%</b> vem da quantidade de atividades com registro positivo lançadas no bimestre. Ajuste as metas abaixo para a realidade da turma.
+              </div>
+
+              <Card style={{marginBottom:20,maxWidth:640}}>
+                <Label>Configuração do cálculo</Label>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+                  <div>
+                    <Label style={{marginBottom:4}}>Pontos de Aura p/ nota 10</Label>
+                    <Input type="number" value={cfgForm.metaAura} onChange={e=>setCfgForm(f=>({...f,metaAura:e.target.value}))}/>
+                  </div>
+                  <div>
+                    <Label style={{marginBottom:4}}>Atividades p/ nota 10</Label>
+                    <Input type="number" value={cfgForm.metaAtividades} onChange={e=>setCfgForm(f=>({...f,metaAtividades:e.target.value}))}/>
+                  </div>
+                </div>
+                <Label style={{marginBottom:6}}>Peso no cálculo: {cfgForm.pesoAura}% Aura · {100-cfgForm.pesoAura}% Atividades</Label>
+                <input type="range" min="0" max="100" value={cfgForm.pesoAura} onChange={e=>setCfgForm(f=>({...f,pesoAura:parseInt(e.target.value)}))} style={{width:"100%",marginBottom:16}}/>
+                <Btn onClick={()=>salvarConfigNotas({metaAura:parseInt(cfgForm.metaAura)||1500,metaAtividades:parseInt(cfgForm.metaAtividades)||20,pesoAura:cfgForm.pesoAura/100})} variant="primary" size="sm">Salvar configuração</Btn>
+              </Card>
+
+              {alunos.length===0?(
+                <Card><div style={{textAlign:"center",color:C.textMuted,padding:"40px 0"}}><div style={{fontSize:48,marginBottom:12}}>📊</div>Nenhum aluno ainda.<br/>Vá para a aba Alunos!</div></Card>
+              ):(
+                <Card style={{overflowX:"auto"}}>
+                  <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr 1fr 1fr",gap:8,padding:"0 4px 10px",borderBottom:`1px solid ${C.border}`,fontSize:11,fontWeight:700,color:C.textMuted,textTransform:"uppercase",minWidth:520}}>
+                    <span>Aluno</span><span style={{textAlign:"center"}}>Aura</span><span style={{textAlign:"center"}}>Ativ.</span><span style={{textAlign:"center"}}>N. Aura</span><span style={{textAlign:"center"}}>N. Ativ.</span><span style={{textAlign:"center"}}>Nota Final</span>
+                  </div>
+                  {[...alunos].map(a=>({a,...calcularNota(a)})).sort((x,y)=>y.notaFinal-x.notaFinal).map(({a,qtdAtividades,notaAura,notaAtividades,notaFinal})=>{
+                    const cor=notaFinal>=7?C.green:notaFinal>=5?C.yellow:C.red;
+                    return(
+                      <div key={a.id} style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr 1fr 1fr",gap:8,padding:"10px 4px",borderBottom:`1px solid ${C.border}`,alignItems:"center",fontSize:13,minWidth:520}}>
+                        <span style={{fontWeight:700,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.nome}</span>
+                        <span style={{textAlign:"center",color:C.textSub}}>{a.pontos.toLocaleString()}</span>
+                        <span style={{textAlign:"center",color:C.textSub}}>{qtdAtividades}</span>
+                        <span style={{textAlign:"center",color:C.textSub}}>{notaAura.toFixed(1)}</span>
+                        <span style={{textAlign:"center",color:C.textSub}}>{notaAtividades.toFixed(1)}</span>
+                        <span style={{textAlign:"center",fontWeight:900,color:cor}}>{notaFinal.toFixed(1)}</span>
+                      </div>
+                    );
+                  })}
+                </Card>
+              )}
             </div>
           )}
 
