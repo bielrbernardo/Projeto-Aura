@@ -165,10 +165,24 @@ function TelaLogin() {
   }
   async function handleGoogle(){
     setErro("");setLoading(true);
+    const provider=new firebase.auth.GoogleAuthProvider();
     try{
-      const c=await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+      const c=await auth.signInWithPopup(provider);
       await db.collection("usuarios").doc(c.user.uid).set({nome:c.user.displayName||"Professor",email:c.user.email,criadoEm:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
-    }catch(e){setErro("Erro ao entrar com Google.");}
+    }catch(e){
+      console.error("Aura: erro no login Google (popup):",e.code,e.message);
+      const popupFalhou=["auth/popup-blocked","auth/cancelled-popup-request","auth/popup-closed-by-user","auth/operation-not-supported-in-this-environment"].includes(e.code);
+      if(popupFalhou){
+        try{ await auth.signInWithRedirect(provider); return; } // página recarrega; resultado tratado no App
+        catch(e2){
+          console.error("Aura: erro no login Google (redirect):",e2.code,e2.message);
+          setErro(`Erro ao entrar com Google (${e2.code||"desconhecido"}). Veja o console (F12) para detalhes.`);
+        }
+      }else{
+        const m={"auth/unauthorized-domain":"Este domínio não está autorizado no Firebase Console.","auth/network-request-failed":"Falha de rede ao contatar o Google.","auth/operation-not-allowed":"Login com Google está desativado no projeto Firebase."};
+        setErro(m[e.code]||`Erro ao entrar com Google (${e.code||"desconhecido"}). Veja o console (F12) para detalhes.`);
+      }
+    }
     setLoading(false);
   }
   async function handleRecuperar(){
@@ -249,12 +263,34 @@ function App() {
   const toastRef=useRef();
 
   useEffect(()=>{
-    return auth.onAuthStateChanged(async u=>{
+    auth.getRedirectResult().then(async result=>{
+      if(result?.user){
+        try{
+          await db.collection("usuarios").doc(result.user.uid).set({nome:result.user.displayName||"Professor",email:result.user.email,criadoEm:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+        }catch(e){console.error("Aura: erro ao salvar perfil após redirect:",e.code,e.message);}
+      }
+    }).catch(e=>{
+      if(e.code) console.error("Aura: erro no retorno do login Google (redirect):",e.code,e.message);
+    });
+    const timeoutId=setTimeout(()=>{
+      setUsuario(u=>{
+        if(u===undefined){console.error("Aura: tempo esgotado esperando o Firebase Auth responder. Verifique conexão e domínio autorizado.");return null;}
+        return u;
+      });
+    },8000);
+    const unsub=auth.onAuthStateChanged(async u=>{
+      clearTimeout(timeoutId);
       if(u){
-        const doc=await db.collection("usuarios").doc(u.uid).get();
-        setUsuario({uid:u.uid,nome:u.displayName||doc.data()?.nome||"Professor",email:u.email});
+        try{
+          const doc=await db.collection("usuarios").doc(u.uid).get();
+          setUsuario({uid:u.uid,nome:u.displayName||doc.data()?.nome||"Professor",email:u.email});
+        }catch(e){
+          console.error("Aura: erro ao carregar perfil do Firestore:",e);
+          setUsuario({uid:u.uid,nome:u.displayName||"Professor",email:u.email});
+        }
       }else setUsuario(null);
     });
+    return ()=>{clearTimeout(timeoutId);unsub();};
   },[]);
 
   const iniciouTurma = useRef(false);
